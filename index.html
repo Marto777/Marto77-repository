@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Word Scramble</title>
+<style>
+  :root {
+    --bg: #f5f3ee;
+    --card: #ffffff;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #4f46e5;
+    --good: #16a34a;
+    --bad: #dc2626;
+    --tile: #eef0ff;
+    --border: #e5e7eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111318;
+      --card: #1b1e25;
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --accent: #8b85ff;
+      --good: #4ade80;
+      --bad: #f87171;
+      --tile: #262a36;
+      --border: #2e323c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .game {
+    width: 100%;
+    max-width: 480px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+  }
+  h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  .sub { margin: 0 0 20px; color: var(--muted); font-size: .95rem; }
+  .stats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    font-size: .9rem;
+    color: var(--muted);
+  }
+  .stats b { display: block; font-size: 1.3rem; color: var(--text); }
+  .timer-bar {
+    height: 6px;
+    background: var(--tile);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .timer-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 100%;
+    transition: width 1s linear;
+  }
+  .tiles {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    min-height: 56px;
+  }
+  .tile {
+    width: 48px;
+    height: 56px;
+    display: grid;
+    place-items: center;
+    background: var(--tile);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+    transition: transform .1s, opacity .15s;
+  }
+  .tile:hover { transform: translateY(-2px); }
+  .tile.used { opacity: .25; cursor: default; transform: none; }
+  .hint { min-height: 1.4em; color: var(--muted); font-style: italic; margin-bottom: 16px; }
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 1.2rem;
+    text-align: center;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  .shake { animation: shake .35s; border-color: var(--bad); }
+  @keyframes shake {
+    25% { transform: translateX(-6px); }
+    50% { transform: translateX(6px); }
+    75% { transform: translateX(-4px); }
+  }
+  .buttons { display: flex; gap: 8px; margin-top: 12px; }
+  button {
+    flex: 1;
+    padding: 10px;
+    font-size: .95rem;
+    font-weight: 600;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--tile);
+    color: var(--text);
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .msg { min-height: 1.5em; margin-top: 14px; font-weight: 600; }
+  .msg.good { color: var(--good); }
+  .msg.bad { color: var(--bad); }
+  .over { display: none; }
+  .over.show { display: block; }
+  .over h2 { margin: 8px 0; }
+  .best { color: var(--muted); margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<main class="game">
+  <h1>Word Scramble</h1>
+  <p class="sub">Unscramble the letters before time runs out.</p>
+
+  <section id="play">
+    <div class="stats">
+      <div>Score<b id="score">0</b></div>
+      <div>Streak<b id="streak">0</b></div>
+      <div>Time<b id="time">60</b></div>
+    </div>
+    <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+
+    <div class="tiles" id="tiles"></div>
+    <div class="hint" id="hint"></div>
+
+    <input id="guess" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type your answer">
+    <div class="buttons">
+      <button id="hintBtn">Hint (−1)</button>
+      <button id="shuffleBtn">Shuffle</button>
+      <button id="skipBtn">Skip</button>
+      <button id="submitBtn" class="primary">Check</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <section class="over" id="over">
+    <h2>Time's up!</h2>
+    <p>You scored <b id="finalScore">0</b> points.</p>
+    <p class="best" id="best"></p>
+    <div class="buttons"><button class="primary" id="againBtn">Play again</button></div>
+  </section>
+</main>
+
+<script>
+const WORDS = [
+  ["apple", "A common fruit"], ["planet", "Orbits a star"], ["guitar", "Six-stringed instrument"],
+  ["bridge", "Crosses a river"], ["castle", "Home of a king"], ["dragon", "Fire-breathing beast"],
+  ["garden", "Where flowers grow"], ["jungle", "Dense tropical forest"], ["rocket", "Goes to space"],
+  ["winter", "The coldest season"], ["pencil", "You write with it"], ["candle", "Gives light with a flame"],
+  ["mirror", "Shows your reflection"], ["pirate", "Sails for treasure"], ["coffee", "Morning drink"],
+  ["island", "Land surrounded by water"], ["puzzle", "Something to solve"], ["shadow", "Follows you in sunlight"],
+  ["monkey", "Loves bananas"], ["school", "Place of learning"], ["thunder", "Sound after lightning"],
+  ["blanket", "Keeps you warm in bed"], ["kitchen", "Where meals are cooked"], ["volcano", "Erupts with lava"],
+  ["penguin", "Bird that can't fly"], ["library", "Full of books"], ["rainbow", "Colors after rain"],
+  ["dolphin", "Smart sea mammal"], ["pyramid", "Ancient Egyptian tomb"], ["diamond", "Hardest gemstone"],
+  ["chicken", "Lays eggs"], ["balloon", "Floats when filled"], ["octopus", "Has eight arms"],
+  ["lantern", "Portable light"], ["captain", "Leads a ship"], ["mountain", "Very tall landform"],
+  ["elephant", "Has a trunk"], ["computer", "You might be using one now"], ["treasure", "Hidden riches"],
+  ["umbrella", "Keeps you dry"], ["keyboard", "Has many keys"], ["sandwich", "Food between bread"],
+  ["dinosaur", "Extinct giant reptile"], ["football", "Popular team sport"], ["squirrel", "Collects acorns"]
+];
+const ROUND_SECONDS = 60;
+
+const $ = id => document.getElementById(id);
+let current, scrambled, score, streak, timeLeft, timer, hintsUsed, queue;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function scramble(word) {
+  let s;
+  do { s = shuffle(word.split("")).join(""); } while (s === word);
+  return s;
+}
+
+function renderTiles() {
+  const typed = $("guess").value.toLowerCase().split("");
+  $("tiles").innerHTML = "";
+  scrambled.split("").forEach(ch => {
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.textContent = ch;
+    const idx = typed.indexOf(ch);
+    if (idx !== -1) { typed.splice(idx, 1); tile.classList.add("used"); }
+    else tile.onclick = () => { $("guess").value += ch; renderTiles(); $("guess").focus(); };
+    $("tiles").appendChild(tile);
+  });
+}
+
+function nextWord() {
+  if (!queue.length) queue = shuffle(WORDS);
+  current = queue.pop();
+  scrambled = scramble(current[0]);
+  hintsUsed = 0;
+  $("guess").value = "";
+  $("hint").textContent = current[1];
+  renderTiles();
+  $("guess").focus();
+}
+
+function flash(text, cls) {
+  $("msg").textContent = text;
+  $("msg").className = "msg " + (cls || "");
+}
+
+function updateStats() {
+  $("score").textContent = score;
+  $("streak").textContent = streak;
+  $("time").textContent = timeLeft;
+  $("timerFill").style.width = (timeLeft / ROUND_SECONDS * 100) + "%";
+}
+
+function check() {
+  const guess = $("guess").value.trim().toLowerCase();
+  if (!guess) return;
+  if (guess === current[0]) {
+    streak++;
+    const points = Math.max(1, current[0].length - hintsUsed) + (streak >= 3 ? 2 : 0);
+    score += points;
+    timeLeft = Math.min(ROUND_SECONDS, timeLeft + 3);
+    flash(`Correct! +${points}${streak >= 3 ? " (streak bonus)" : ""}`, "good");
+    updateStats();
+    nextWord();
+  } else {
+    streak = 0;
+    updateStats();
+    flash("Not quite — try again", "bad");
+    const input = $("guess");
+    input.classList.remove("shake");
+    void input.offsetWidth;
+    input.classList.add("shake");
+  }
+}
+
+function hint() {
+  const word = current[0];
+  if (hintsUsed >= word.length - 1) return;
+  hintsUsed++;
+  score = Math.max(0, score - 1);
+  $("guess").value = word.slice(0, hintsUsed);
+  updateStats();
+  renderTiles();
+  flash(`Starts with "${word.slice(0, hintsUsed).toUpperCase()}"`);
+  $("guess").focus();
+}
+
+function skip() {
+  streak = 0;
+  flash(`The word was "${current[0].toUpperCase()}"`, "bad");
+  updateStats();
+  nextWord();
+}
+
+function endGame() {
+  clearInterval(timer);
+  let best = 0;
+  try { best = +localStorage.getItem("wordScrambleBest") || 0; } catch (e) {}
+  if (score > best) {
+    best = score;
+    try { localStorage.setItem("wordScrambleBest", best); } catch (e) {}
+    $("best").textContent = "New best score!";
+  } else {
+    $("best").textContent = `Best: ${best}`;
+  }
+  $("finalScore").textContent = score;
+  $("play").style.display = "none";
+  $("over").classList.add("show");
+  $("againBtn").focus();
+}
+
+function start() {
+  score = 0; streak = 0; timeLeft = ROUND_SECONDS; queue = shuffle(WORDS);
+  $("play").style.display = "";
+  $("over").classList.remove("show");
+  flash("");
+  updateStats();
+  nextWord();
+  clearInterval(timer);
+  timer = setInterval(() => {
+    timeLeft--;
+    updateStats();
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+}
+
+$("guess").addEventListener("input", renderTiles);
+$("guess").addEventListener("keydown", e => { if (e.key === "Enter") check(); });
+$("submitBtn").onclick = check;
+$("hintBtn").onclick = hint;
+$("skipBtn").onclick = skip;
+$("shuffleBtn").onclick = () => { scrambled = scramble(scrambled); renderTiles(); $("guess").focus(); };
+$("againBtn").onclick = start;
+
+start();
+</script>
+</body>
+</html>
